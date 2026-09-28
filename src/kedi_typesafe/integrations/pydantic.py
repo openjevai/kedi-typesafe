@@ -67,6 +67,7 @@ class TypeSafeModel(upstream.TypeSafeModel):
         model_name: str = "jev-latest",
         *,
         api_key: str | None = None,
+        provider: str | None = None,
         threshold: float = DEFAULT_THRESHOLD,
         timeout: float | None = None,
         client: AsyncSystemOneClient | None = None,
@@ -76,6 +77,7 @@ class TypeSafeModel(upstream.TypeSafeModel):
         self._evaluator = TypeSafeEvaluator(
             model_name,
             api_key=api_key,
+            provider=provider,
             threshold=threshold,
             timeout=timeout,
             client=client,

@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 import math
+import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol, TypeAlias
@@ -28,6 +29,36 @@ from .schema import EvaluationPlan, QuestionSpec, build_evaluation_plan
 
 JSONValue: TypeAlias = JSONContent
 DEFAULT_THRESHOLD = 0.85
+
+TYPESAFE_BASE_URL = "https://api.typesafe.ai"
+OPENJEV_BASE_URL = "https://api.openjev.sh"
+TYPESAFE_DEFAULT_MODEL = "jev-latest"
+OPENJEV_MODEL = "openjev"
+
+
+def _resolve_provider(
+    provider: str | None,
+    api_key: str | None,
+    model_name: str,
+) -> tuple[str, str, str | None, str]:
+    """Resolve (provider, base_url, api_key, model_name).
+
+    Selection rule:
+    1. Explicit choice wins (``provider`` param or ``JEV_PROVIDER`` env).
+    2. Otherwise, if ``TYPESAFE_API_KEY`` is set → TypeSafe (default unchanged).
+    3. Otherwise, if only ``OPENJEV_API_KEY`` is set → OpenJEV.
+    """
+    explicit = (provider or os.environ.get("JEV_PROVIDER", "")).strip().lower()
+    typesafe_key = os.environ.get("TYPESAFE_API_KEY")
+    openjev_key = os.environ.get("OPENJEV_API_KEY")
+
+    if explicit == "openjev" or (not explicit and not typesafe_key and openjev_key):
+        resolved_key = api_key or openjev_key
+        resolved_model = OPENJEV_MODEL if model_name == TYPESAFE_DEFAULT_MODEL else model_name
+        return ("openjev", OPENJEV_BASE_URL, resolved_key, resolved_model)
+
+    # TypeSafe — default or explicit
+    return ("typesafe", TYPESAFE_BASE_URL, api_key or typesafe_key, model_name)
 
 
 def _request_metadata(
@@ -136,6 +167,7 @@ class TypeSafeEvaluator:
         model_name: str = "jev-latest",
         *,
         api_key: str | None = None,
+        provider: str | None = None,
         threshold: float = DEFAULT_THRESHOLD,
         timeout: float | None = None,
         client: AsyncSystemOneClient | None = None,
@@ -145,15 +177,21 @@ class TypeSafeEvaluator:
         model_name = model_name.strip()
         if not model_name:
             raise ValueError("TypeSafe model name must not be empty")
+        self.provider, self._base_url, self._api_key, model_name = _resolve_provider(
+            provider, api_key, model_name
+        )
         self.model_name = model_name
         self.threshold = validate_threshold(threshold)
         self.text_extractors = dict(text_extractors or {})
-        self._api_key = api_key
         self._timeout = timeout
         self._borrowed_client = client
         self._clients: dict[asyncio.AbstractEventLoop, AsyncSystemOneClient] = {}
         self._owns_sync_client = sync_client is None
         self._sync_client = sync_client
+
+    @property
+    def base_url(self) -> str:
+        return self._base_url
 
     async def evaluate(
         self,
@@ -203,6 +241,7 @@ class TypeSafeEvaluator:
                     api_key=self._api_key,
                     model=self.model_name,
                     timeout=self._timeout,
+                    base_url=self._base_url,
                 )
                 self._clients[loop] = client
         return client
@@ -237,6 +276,7 @@ class TypeSafeEvaluator:
                 api_key=self._api_key,
                 model=self.model_name,
                 timeout=self._timeout,
+                base_url=self._base_url,
             )
             self._sync_client = client
         response = client.system_one(
@@ -453,6 +493,10 @@ __all__ = [
     "AsyncSystemOneClient",
     "EvaluationResult",
     "JSONValue",
+    "OPENJEV_BASE_URL",
+    "OPENJEV_MODEL",
     "SystemOneClient",
+    "TYPESAFE_BASE_URL",
+    "TYPESAFE_DEFAULT_MODEL",
     "TypeSafeEvaluator",
 ]

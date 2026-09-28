@@ -4,6 +4,8 @@ Framework-native integrations for using TypeSafe AI's Jev models with Kedi's sup
 frameworks. Core Jev schema translation and the Pydantic AI and LangChain integrations ship as
 one `kedi-typesafe` package.
 
+> **OpenJEV support:** Jev is built by [TypeSafe](https://typesafe.ai). This fork keeps TypeSafe as the default and adds optional support for [OpenJEV](https://openjev.sh), a free community gateway to the same Jev model — set `OPENJEV_API_KEY` (or `JEV_PROVIDER=openjev`) to use it. Original project: https://github.com/kedi-lang/kedi-typesafe by @kedi-lang.
+
 ## Pydantic AI
 
 Install the package and provide `TYPESAFE_API_KEY` in your environment:

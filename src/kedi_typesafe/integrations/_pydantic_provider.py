@@ -15,11 +15,11 @@ class EvaluatorProvider(Provider[Any]):
 
     @property
     def name(self) -> str:
-        return "typesafe"
+        return self.evaluator.provider
 
     @property
     def base_url(self) -> str:
-        return "https://api.typesafe.ai/v1"
+        return self.evaluator.base_url
 
     @property
     def client(self) -> AsyncSystemOneClient:

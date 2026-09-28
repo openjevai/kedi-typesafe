@@ -11,7 +11,7 @@ from langchain_typesafe.types import State
 from pydantic import JsonValue, TypeAdapter
 from typesafe_sdk import Question, SystemOneResponse
 
-from ..core.evaluation import JSONValue
+from ..core.evaluation import JSONValue, _resolve_provider
 
 _QUESTIONS = TypeAdapter(dict[str, ClassifierQuestion])
 # The bridge accepts only the JSON subset of the classifier's broader State type.
@@ -21,9 +21,18 @@ _STATE: TypeAdapter[State] = TypeAdapter(str | list[JsonValue] | dict[str, JsonV
 class ClassifierTransport:
     """Reuse official transport without nesting another LLM invocation span."""
 
-    def __init__(self, *, api_key: str | None, timeout: float | None) -> None:
+    def __init__(
+        self,
+        *,
+        api_key: str | None,
+        timeout: float | None,
+        provider: str | None = None,
+    ) -> None:
         self.api_key = api_key
         self.timeout = timeout
+        self.provider, self._base_url, self._resolved_key, self._default_model = _resolve_provider(
+            provider, api_key, "jev-latest"
+        )
         self._sync: TypeSafeClassifier | None = None
         self._async: dict[asyncio.AbstractEventLoop, TypeSafeClassifier] = {}
 
@@ -42,17 +51,18 @@ class ClassifierTransport:
         if base is None:
             base = TypeSafeClassifier(
                 questions=typed,
-                model=model or "jev-latest",
+                model=model or self._default_model,
                 timeout=self.timeout if self.timeout is not None else 30.0,
-                api_key=self.api_key
-                if self.api_key is not None
+                api_key=self._resolved_key
+                if self._resolved_key is not None
                 else os.environ.get("TYPESAFE_API_KEY", ""),
+                base_url=self._base_url,
             )
             if loop is None:
                 self._sync = base
             else:
                 self._async[loop] = base
-        return base.model_copy(update={"questions": typed, "model": model or "jev-latest"})
+        return base.model_copy(update={"questions": typed, "model": model or self._default_model})
 
     async def system_one(
         self, state: JSONValue, questions: Mapping[str, Question], *, model: str | None = None

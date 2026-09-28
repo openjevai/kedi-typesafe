@@ -125,6 +125,7 @@ class TypeSafeChatModel(BaseChatModel):
         model_name: str = "jev-latest",
         *,
         api_key: str | None = None,
+        provider: str | None = None,
         threshold: float = DEFAULT_THRESHOLD,
         timeout: float | None = None,
         client: AsyncSystemOneClient | None = None,
@@ -140,12 +141,13 @@ class TypeSafeChatModel(BaseChatModel):
         }
         super().__init__(**model_values)
         if client is None or sync_client is None:
-            self._transport = ClassifierTransport(api_key=api_key, timeout=timeout)
+            self._transport = ClassifierTransport(api_key=api_key, timeout=timeout, provider=provider)
             client = client or self._transport
             sync_client = sync_client or SyncClassifierTransport(self._transport)
         self._evaluator = TypeSafeEvaluator(
             model_name,
             api_key=api_key,
+            provider=provider,
             threshold=threshold,
             timeout=timeout,
             client=client,
